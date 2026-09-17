@@ -73,11 +73,13 @@ Build from this directory:
 "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" FFFCheat.vcxproj /p:Configuration=Release /p:Platform=x64 /nologo /v:minimal
 ```
 
-`Debug|x64` is also available. The project deploys `FFFCheat.asi` to:
-
-```text
-E:\SteamLibrary\steamapps\common\Red Dead Redemption 2
-```
+`Debug|x64` is also available. The project's `PostBuildEvent` auto-locates
+the RDR2 install directory (`BuildTools\Find-RDR2GameDir.ps1` -- vendored
+identically into every sibling project, since each is its own separate
+git repo) and deploys `FFFCheat.asi` there, on every build regardless of
+whether the build itself was up to date.
+`DisableFastUpToDateCheck` is set in the `.vcxproj.user` so this also
+holds for Visual Studio IDE builds, not just command-line MSBuild.
 
 RDR2 must not have this ASI loaded while the post-build copy runs. Check:
 
