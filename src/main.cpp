@@ -1,4 +1,4 @@
-#include "..\..\ScriptHookSDK\inc\main.h"
+#include "..\external\ScriptHookSDK\inc\main.h"
 
 #include "FFFCheat.h"
 
