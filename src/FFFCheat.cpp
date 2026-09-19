@@ -5,13 +5,13 @@
 
 #include "..\external\RDR-Classes\rage\joaat.hpp"
 
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace
 {
@@ -29,31 +29,26 @@ namespace
 	struct PatchedProgram
 	{
 		rage::scrProgram* program = nullptr;
-		std::uint8_t** originalPages = nullptr;
-		std::unique_ptr<std::uint8_t*[]> patchedPages;
-		std::uint32_t pageCount = 0;
-
-		~PatchedProgram()
-		{
-			for (std::uint32_t page = 0; page < pageCount; ++page)
-				delete[] patchedPages[page];
-		}
+		std::uint8_t* page = nullptr;
+		std::uint8_t* target = nullptr;
 	};
 
 	std::unique_ptr<PatchedProgram> g_patch;
 
-	void Restore(rage::scrProgram* liveProgram = nullptr)
+	bool WriteByte(std::uint8_t* address, std::uint8_t value)
 	{
-		if (!g_patch)
-			return;
+		DWORD oldProtect = 0;
+		if (!VirtualProtect(address, 1, PAGE_EXECUTE_READWRITE, &oldProtect))
+			return false;
 
-		if (liveProgram == g_patch->program && liveProgram->m_CodeBlocks == g_patch->patchedPages.get())
-			liveProgram->m_CodeBlocks = g_patch->originalPages;
-
-		g_patch.reset();
-		Log::Write("fillet_sp patch restored");
+		*address = value;
+		VirtualProtect(address, 1, oldProtect, &oldProtect);
+		return true;
 	}
 
+	// The game owns the code pages and frees them with the program when the
+	// script unloads, so the patch is made in place. Swapping in a cloned
+	// page table makes the game tear down memory its allocator never made.
 	bool Apply(rage::scrProgram* program)
 	{
 		if (!program || !program->IsValid())
@@ -64,40 +59,51 @@ namespace
 			kReturnFalseOpcodeOffset >= program->m_CodeSize)
 			return false;
 
-		auto patch = std::make_unique<PatchedProgram>();
-		patch->program = program;
-		patch->originalPages = program->m_CodeBlocks;
-		patch->pageCount = pageCount;
-		patch->patchedPages = std::make_unique<std::uint8_t*[]>(pageCount);
-
-		for (std::uint32_t page = 0; page < pageCount; ++page)
-		{
-			const std::uint32_t pageSize = program->GetCodePageSize(page);
-			patch->patchedPages[page] = new std::uint8_t[pageSize];
-			std::memcpy(patch->patchedPages[page], program->GetCodePage(page), pageSize);
-		}
-
 		const std::uint32_t functionPage = (kReturnFalseOpcodeOffset - 5) >> 14;
 		const std::uint32_t functionOffset = (kReturnFalseOpcodeOffset - 5) & 0x3FFF;
 		const std::uint32_t page = kReturnFalseOpcodeOffset >> 14;
 		const std::uint32_t offset = kReturnFalseOpcodeOffset & 0x3FFF;
-		const std::uint32_t pageSize = program->GetCodePageSize(page);
-		if (functionPage != page || functionOffset + kExpectedReturnFalseFunction.size() > pageSize)
+		if (functionPage != page || page >= pageCount || !program->m_CodeBlocks[page] ||
+			functionOffset + kExpectedReturnFalseFunction.size() > 0x4000)
 			return false;
 
-		auto* target = &patch->patchedPages[page][offset];
-		const auto* function = &patch->patchedPages[functionPage][functionOffset];
+		std::uint8_t* pageBase = program->m_CodeBlocks[page];
+		const auto* function = &pageBase[functionOffset];
 		if (!std::equal(kExpectedReturnFalseFunction.begin(), kExpectedReturnFalseFunction.end(), function))
 		{
 			Log::Write("fillet_sp bytecode guard failed; patch not applied");
 			return false;
 		}
 
-		*target = kPushConstOne;
-		program->m_CodeBlocks = patch->patchedPages.get();
-		g_patch = std::move(patch);
+		auto* target = &pageBase[offset];
+		if (!WriteByte(target, kPushConstOne))
+		{
+			Log::Write("fillet_sp patch failed: VirtualProtect");
+			return false;
+		}
+
+		g_patch = std::make_unique<PatchedProgram>();
+		g_patch->program = program;
+		g_patch->page = pageBase;
+		g_patch->target = target;
 		Log::Write("fillet_sp patched: any valid button now counts as correct");
 		return true;
+	}
+
+	void Restore(rage::scrProgram* liveProgram)
+	{
+		if (!g_patch)
+			return;
+
+		// Only touch the byte if the same program and page are still live;
+		// otherwise the game has already freed them.
+		if (liveProgram == g_patch->program && liveProgram->m_CodeBlocks &&
+			liveProgram->m_CodeBlocks[kReturnFalseOpcodeOffset >> 14] == g_patch->page &&
+			*g_patch->target == kPushConstOne)
+			WriteByte(g_patch->target, kPushConstZero);
+
+		g_patch.reset();
+		Log::Write("fillet_sp patch restored");
 	}
 }
 
@@ -105,27 +111,19 @@ namespace FFFCheat
 {
 	void OnTick()
 	{
+		auto liveProgram = GamePointers::FindScriptProgram(kFilletScriptHash);
 		if (g_patch)
 		{
-			auto liveProgram = GamePointers::FindScriptProgram(kFilletScriptHash);
-			if (liveProgram == g_patch->program)
-			{
-				if (liveProgram->m_CodeBlocks == g_patch->patchedPages.get())
-					return;
-
-				Restore(liveProgram);
-			}
-			else
-			{
-				// The script program can be destroyed when fillet_sp unloads;
-				// do not dereference the stale pointer in that case.
-				g_patch.reset();
-				Log::Write("fillet_sp patch discarded after script unload");
+			// Compare pointers only; the old program may already be freed.
+			if (liveProgram == g_patch->program && liveProgram->m_CodeBlocks &&
+				liveProgram->m_CodeBlocks[kReturnFalseOpcodeOffset >> 14] == g_patch->page)
 				return;
-			}
+
+			g_patch.reset();
+			Log::Write("fillet_sp patch discarded after script unload");
 		}
 
-		Apply(GamePointers::FindScriptProgram(kFilletScriptHash));
+		Apply(liveProgram);
 	}
 
 	void Shutdown()

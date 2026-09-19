@@ -6,10 +6,12 @@ press counts as correct regardless of the generated sequence.
 
 ## Implementation
 
-`src/FFFCheat.cpp` finds the loaded `rage::scrProgram` named `fillet_sp`,
-clones all of its bytecode pages, modifies the clone, and changes the
-program's code-page table to the clone. The original table is restored when
-the script unloads or the ASI unloads.
+`src/FFFCheat.cpp` finds the loaded `rage::scrProgram` named `fillet_sp`
+and patches one byte of its bytecode in place (via `VirtualProtect`). Do
+**not** clone the code pages or swap `m_CodeBlocks`: the game frees the
+program's pages itself when the script unloads, and pointing it at our heap
+memory crashed the game (error FFFFFFFF) on leaving the table. On ASI
+unload the byte is restored only if the same program/page is still live.
 
 The sole patch is in `fillet_sp.ysc.c`'s unused `func_657` override:
 
@@ -61,9 +63,9 @@ D:\Backup\Stuff\RDR2 Shit\SciptsCompile\script_rel\fillet_sp.ysc.full
   Use `std::string` or `std::ostringstream`.
 - Log through `Log::Write`; runtime output goes to `FFFCheat.log` in the
   game directory.
-- Keep modifications surgical. The copied bytecode pages must remain owned
-  by `PatchedProgram` until the original page-table pointer is restored or
-  the target script unloads.
+- Keep modifications surgical. Never hand the game memory it did not
+  allocate, and never dereference a cached `scrProgram*` after the script
+  may have unloaded; compare pointers first.
 
 ## Build and deploy
 
@@ -97,7 +99,7 @@ fillet_sp patched: any valid button now counts as correct
 
 - `src/main.cpp` registers `ScriptMain`; every frame calls
   `FFFCheat::OnTick()`.
-- `src/FFFCheat.cpp` owns page cloning, bytecode validation, patching, and
+- `src/FFFCheat.cpp` owns bytecode validation, in-place patching, and
   restoration.
 - `src/GamePointers.cpp` locates the game’s script-program table and finds
   a program by its JOAAT hash.
