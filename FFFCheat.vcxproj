@@ -11,16 +11,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Config.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\FFFCheat.cpp" />
     <ClCompile Include="src\GamePointers.cpp" />
     <ClCompile Include="src\PatternScan.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Config.h" />
     <ClInclude Include="src\FFFCheat.h" />
     <ClInclude Include="src\GamePointers.h" />
     <ClInclude Include="src\Log.h" />
     <ClInclude Include="src\PatternScan.h" />
+    <ClInclude Include="external\inipp\inipp\inipp.h" />
     <ClInclude Include="external\RDR-Classes\base\pgBase.hpp" />
     <ClInclude Include="external\RDR-Classes\rage\joaat.hpp" />
     <ClInclude Include="external\RDR-Classes\script\scrNativeHandler.hpp" />
