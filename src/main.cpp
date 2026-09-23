@@ -11,7 +11,7 @@ void ScriptMain()
 	}
 }
 
-BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID)
+BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID lpReserved)
 {
 	if (reason == DLL_PROCESS_ATTACH)
 	{
@@ -19,7 +19,11 @@ BOOL APIENTRY DllMain(HMODULE hInstance, DWORD reason, LPVOID)
 	}
 	else if (reason == DLL_PROCESS_DETACH)
 	{
-		FFFCheat::Shutdown();
+		// Non-null lpReserved: the process is exiting, so the game's memory
+		// is going away with it -- restoring bytes (and writing the log
+		// under the loader lock) would only add risk.
+		if (!lpReserved)
+			FFFCheat::Shutdown();
 		scriptUnregister(hInstance);
 	}
 

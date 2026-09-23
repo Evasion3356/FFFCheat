@@ -99,7 +99,9 @@ stack in sibling projects. After cloning, run
 - Do not add fixed-size C string buffers or `sprintf`-style formatting.
   Use `std::string` or `std::ostringstream`.
 - Log through `Log::Write`; runtime output goes to `FFFCheat.log` in the
-  game directory.
+  game directory, or `%LOCALAPPDATA%\RDR2ASIMods\FFFCheat.log` when that
+  isn't writable (see `src/LogFallback.h`; `tests/LogFallbackTests.vcxproj`
+  covers it).
 - Keep modifications surgical. Never hand the game memory it did not
   allocate, and never dereference a cached `scrProgram*` after the script
   may have unloaded; compare pointers first.

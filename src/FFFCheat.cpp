@@ -102,6 +102,13 @@ namespace
 
 	std::unique_ptr<PatchedProgram> g_patch;
 
+	// The live program Apply() last refused (guard mismatch, bad layout).
+	// Compared by pointer only, like StillLive(), so a refused program isn't
+	// re-checked -- and the INI re-read, and the log re-written -- every
+	// frame for as long as the player sits at the table.
+	rage::scrProgram* g_rejectedProgram = nullptr;
+	std::uint8_t* g_rejectedFirstPage = nullptr;
+
 	bool WriteBytes(std::uint8_t* address, const Bytes& bytes)
 	{
 		DWORD oldProtect = 0;
@@ -202,8 +209,11 @@ namespace
 		return true;
 	}
 
-	// True while the program and every patched page are still the live ones.
-	// Compares pointers only; the old program may already be freed.
+	// True while the program and every patched page are still the live ones
+	// and still hold our bytes. Pointers are compared first: the old program
+	// may already be freed. Only once they match -- i.e. the memory is the
+	// live program's own -- are the bytes read, which catches a reload that
+	// the allocator happened to place at the same addresses.
 	bool StillLive(rage::scrProgram* liveProgram)
 	{
 		if (!g_patch || liveProgram != g_patch->program || !liveProgram->m_CodeBlocks)
@@ -211,6 +221,10 @@ namespace
 
 		for (const auto& p : g_patch->patches)
 			if (liveProgram->m_CodeBlocks[p.page] != p.pageBase)
+				return false;
+
+		for (const auto& p : g_patch->patches)
+			if (!std::equal(p.replacement.begin(), p.replacement.end(), p.target))
 				return false;
 
 		return true;
@@ -249,7 +263,29 @@ namespace FFFCheat
 			Log::Write("fillet_sp patch discarded after script unload");
 		}
 
-		Apply(liveProgram);
+		if (!liveProgram)
+		{
+			g_rejectedProgram = nullptr;
+			g_rejectedFirstPage = nullptr;
+			return;
+		}
+
+		std::uint8_t* firstPage = liveProgram->m_CodeBlocks ? liveProgram->m_CodeBlocks[0] : nullptr;
+		if (liveProgram == g_rejectedProgram && firstPage == g_rejectedFirstPage)
+			return;
+
+		if (Apply(liveProgram))
+		{
+			g_rejectedProgram = nullptr;
+			g_rejectedFirstPage = nullptr;
+		}
+		else if (liveProgram->IsValid())
+		{
+			// Not yet valid means still loading -- retry next frame. A valid
+			// program that failed is final until the script reloads.
+			g_rejectedProgram = liveProgram;
+			g_rejectedFirstPage = firstPage;
+		}
 	}
 
 	void Shutdown()
