@@ -17,6 +17,10 @@ loosely follows [Keep a Changelog](https://keepachangelog.com/).
   or a read-only/locked log file), the log now goes to
   `%LOCALAPPDATA%\RDR2ASIMods\FFFCheat.log` instead, and its first line
   names the path that couldn't be used.
+- Settings work in a game folder that can't be written, too:
+  `FFFCheat.ini` is then saved to `%LOCALAPPDATA%\RDR2ASIMods\FFFCheat.ini`
+  (starting from the game folder's copy, if there is one) instead of the
+  mod being stuck on default settings.
 
 ## [1.2.0] - 2026-09-19
 

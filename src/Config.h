@@ -1,6 +1,7 @@
 #pragma once
 
-// INI-backed feature toggles (FFFCheat.ini, next to FFFCheat.asi). Backed by
+// INI-backed feature toggles (FFFCheat.ini, next to FFFCheat.asi, or in
+// %LOCALAPPDATA%\RDR2ASIMods\ when the game folder isn't writable). Backed by
 // inipp (external/inipp, a git submodule), which works on plain std streams
 // and avoids <filesystem>, unsafe on ScriptHookRDR2's small fiber stack.
 namespace Config

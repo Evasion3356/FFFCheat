@@ -1,6 +1,7 @@
 #include "Config.h"
 
 #include "Log.h"
+#include "LogFallback.h"
 
 #include "..\external\inipp\inipp\inipp.h"
 
@@ -12,24 +13,15 @@
 
 namespace
 {
-	// Resolves FFFCheat.ini next to this module's .asi rather than trusting
-	// the process's working directory. The wide path is opened through
-	// MSVC's wide-char stream constructors, so no narrow/wide conversion is
-	// needed.
-	std::wstring ResolveIniPath()
+	// Where FFFCheat.ini is loaded from and saved to: next to the .asi, or
+	// %LOCALAPPDATA%\RDR2ASIMods\FFFCheat.ini when the game folder isn't
+	// writable -- starting from the game folder's copy if there is one (see
+	// LogFallback::ResolveSettings). Resolved once per session.
+	const LogFallback::SettingsPaths& IniPaths()
 	{
-		HMODULE module = nullptr;
-		GetModuleHandleExW(
-			GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-			reinterpret_cast<LPCWSTR>(&ResolveIniPath), &module);
-
-		std::wstring path(MAX_PATH, L'\0');
-		const DWORD length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
-		path.resize(length);
-
-		const std::size_t slash = path.find_last_of(L"\\/");
-		path.resize(slash == std::wstring::npos ? 0 : slash + 1);
-		return path + L"FFFCheat.ini";
+		static const LogFallback::SettingsPaths paths = LogFallback::ResolveSettings(
+			LogFallback::ModuleDirectory(), L"FFFCheat.ini", LogFallback::FallbackDirectory());
+		return paths;
 	}
 
 	// inipp::get_value only writes on success, so seeding with the default
@@ -42,11 +34,11 @@ namespace
 
 	void LoadImpl(Config::Values& values)
 	{
-		const std::wstring path = ResolveIniPath();
+		const LogFallback::SettingsPaths& paths = IniPaths();
 
 		inipp::Ini<char> ini;
 		{
-			std::ifstream in(path);
+			std::ifstream in(paths.read);
 			if (in)
 				ini.parse(in);
 		}
@@ -60,7 +52,11 @@ namespace
 		general["AnyButtonCounts"] = values.AnyButtonCounts ? "true" : "false";
 		general["IgnoreEarlyPress"] = values.IgnoreEarlyPress ? "true" : "false";
 
-		std::ofstream out(path, std::ios::trunc);
+		if (paths.usedFallback)
+			Log::Write("Config: the game folder isn't writable, so settings are saved to " +
+				LogFallback::ToUtf8(paths.write));
+
+		std::ofstream out(paths.write, std::ios::trunc);
 		if (out)
 			ini.generate(out);
 		else
