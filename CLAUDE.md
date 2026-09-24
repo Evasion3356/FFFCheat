@@ -119,7 +119,7 @@ the RDR2 install directory (`BuildTools\Find-RDR2GameDir.ps1` -- vendored
 identically into every sibling project, since each is its own separate
 git repo) and deploys `FFFCheat.asi` there, on every build regardless of
 whether the build itself was up to date.
-`DisableFastUpToDateCheck` is set in the `.vcxproj.user` so this also
+`DisableFastUpToDateCheck` is set in the tracked `.vcxproj` so this also
 holds for Visual Studio IDE builds, not just command-line MSBuild.
 
 RDR2 must not have this ASI loaded while the post-build copy runs. Check:
