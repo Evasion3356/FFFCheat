@@ -39,6 +39,7 @@ successful load logs lines such as:
 ```text
 fillet_sp patched: any-button
 fillet_sp patched: ignore-early-press
+fillet_sp patched: ignore-early-press-no-phantom-miss
 fillet_sp patched: hide-timer-message
 ```
 

@@ -3,6 +3,15 @@
 All notable user-facing changes to FFFCheat are recorded here. Format
 loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.0] - 2026-09-30
+
+### Fixed
+- With `IgnoreEarlyPress` on, the timer no longer freezes after a flourish.
+  If you didn't press during the move a flourish already covered, the game
+  played the miss effects (fail sound, rumble, a cut on your finger) and
+  stopped the timer, but you didn't lose the turn, so you could keep going
+  with the clock stopped. That move now counts as a hit.
+
 ## [1.4.0] - 2026-09-30
 
 ### Fixed

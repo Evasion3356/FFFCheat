@@ -27,6 +27,7 @@ namespace
 	constexpr std::uint8_t kJump = 104;
 	constexpr std::uint8_t kPushConstZero = 47;
 	constexpr std::uint8_t kPushConstOne = 9;
+	constexpr std::uint8_t kIntEqual = 11;
 
 	using Bytes = std::vector<std::uint8_t>;
 
@@ -81,6 +82,33 @@ namespace
 				},
 				0xFE02,
 				{ kJump, 0xB5, 0 }
+			},
+			// Companion to ignore-early-press. When each clip ends, func_480 (0xFEBD)
+			// treats the player's clip as a miss when f_71 == 0 (no press was
+			// registered for it). That catches early presses (f_93) and
+			// wrong-button presses (f_92), but a clip the player already paid
+			// for (f_86 ahead of f_87, e.g. after a flourish) also has f_71 == 0.
+			// With early presses ignored, nothing sets f_93, so that clip reaches
+			// this branch. The player then gets the miss feedback (fail sound,
+			// rumble, finger damage pack) and the countdown is paused for good,
+			// but no life is lost and no fail anim plays, so play goes on with a
+			// frozen timer. Test f_92 == 1 for the player too, as the branch
+			// already does for the AI: at 0x100B7 rewrite
+			//   IOFFSET_U8_LOAD 71; PUSH_CONST_F0; FEQ
+			// to IOFFSET_U8_LOAD 92; PUSH_CONST_1; IEQ.
+			{
+				"ignore-early-press-no-phantom-miss",
+				&Config::Values::IgnoreEarlyPress,
+				{
+					// IS_PED_A_PLAYER(ped) && f_71 == 0f ||
+					// !IS_PED_A_PLAYER(ped) && f_92 == 1, through its JZ.
+					{ 0x1009D, { 102, 1, 102, 0, 24, 80, 2, 23, 202, 3, 5, 0, 213, 106, 139, 14, 0,
+						102, 1, 102, 0, 24, 80, 2, 99, 202, 39, 71, 115, 125, 105, 106, 5, 139, 33, 0,
+						102, 1, 102, 0, 24, 80, 2, 23, 202, 3, 5, 0, 213, 5, 106, 139, 14, 0,
+						102, 1, 102, 0, 24, 80, 2, 99, 202, 39, 92, 9, 11, 105, 48, 139, 30, 0 } }
+				},
+				0x100B8,
+				{ 92, kPushConstOne, kIntEqual }
 			}
 		};
 		return defs;

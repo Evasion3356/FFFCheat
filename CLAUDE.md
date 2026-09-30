@@ -51,6 +51,24 @@ Guards cover the condition (0xFDD8-0xFE0C), the block's closing `J`
 (0xFE2E) and the `LEAVE` (0xFEBA). All guards are checked before any patch is
 written; the patches apply all-or-nothing.
 
+`IgnoreEarlyPress` also enables a companion patch,
+`ignore-early-press-no-phantom-miss`. When each clip ends, `func_480` (0xFEBD)
+treats the player's clip as a miss when `f_71 == 0` (no press was registered
+for it). The branch condition is
+`IS_PED_A_PLAYER && f_71 == 0f || !IS_PED_A_PLAYER && f_92 == 1`. A clip the
+player already paid for (`f_86` ahead of `f_87`, e.g. after a flourish) also
+has `f_71 == 0`. In vanilla, the player's press in that clip made it a real
+miss through `f_93`. With early presses ignored, the clip reaches this branch
+with no miss flag. The player gets the miss feedback (fail sound, rumble,
+finger damage pack via `func_752`) and `func_475(..., 0)` pauses the countdown
+for good, but no life is lost and no fail anim plays, so play continues with a
+frozen timer. The patch rewrites `39 47 73 7D` (`IOFFSET_U8_LOAD 71;
+PUSH_CONST_F0; FEQ`) at 0x100B7 to `39 5C 09 0B` (`IOFFSET_U8_LOAD 92;
+PUSH_CONST_1; IEQ`), so the player needs `f_92` too, like the AI. It is only
+valid while the early-press patch is on, because that is what guarantees
+`f_93` is never set for the player. The guard is the whole condition
+(0x1009D-0x100E4).
+
 ### Third patch: hide the timer's "MESSAGE" placeholder
 
 A game update added a `TXT_Message` text element (placeholder text
@@ -153,6 +171,7 @@ A successful run logs:
 ```text
 fillet_sp patched: any-button
 fillet_sp patched: ignore-early-press
+fillet_sp patched: ignore-early-press-no-phantom-miss
 fillet_sp patched: hide-timer-message
 ```
 
