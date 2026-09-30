@@ -10,7 +10,9 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -84,6 +86,69 @@ namespace
 		return defs;
 	}
 
+	// A game update added a TXT_Message text element to the shared
+	// countdown_timer UI template (widgets.rpf, core/countdown_timer.ymt),
+	// bound to centralScoretimer.timerMessageString with the placeholder text
+	// "Message". fillet_sp never creates that field, so the placeholder shows
+	// over the timer. This hook replaces fillet_sp's own native-table entry
+	// for _DATABINDING_ADD_DATA_STRING: whenever the script adds
+	// "timerString", an empty "timerMessageString" is added to the same
+	// container. The container belongs to the script, so the field goes away
+	// with it when the script tears down its UI.
+	//
+	// Slot 35 of fillet_sp's native table is _DATABINDING_ADD_DATA_STRING.
+	// The guard is the call that adds timerString in func_606 (0x16C4A):
+	//   LOCAL_U8_LOAD 0; IOFFSET_U8_LOAD 70 (f_70, centralScoretimer);
+	//   PUSH_CONST_S16 0x179F ("timerString"); STRING;
+	//   PUSH_CONST_U8 0x36 (""); STRING; NATIVE 3 args, 1 ret, slot 35;
+	//   LOCAL_U8_LOAD 0; IOFFSET_U8_STORE 72 (f_72)
+	constexpr std::uint32_t kAddDataStringSlot = 35;
+	const Guard kTimerStringGuard{ 0x16DE7,
+		{ 102, 0, 39, 70, 37, 159, 23, 4, 109, 54, 4, 3, 13, 0, 35, 102, 0, 108, 72 } };
+
+	// The game's own handler for the slot, set before the hook is written and
+	// never cleared, so the hook can always forward to it.
+	std::atomic<rage::scrNativeHandler> g_addDataStringOriginal{ nullptr };
+	// Set by the hook (on the script's thread), logged by OnTick.
+	std::atomic<bool> g_timerMessageAdded{ false };
+
+	// Lets the hook build a call context of its own; the RDR-Classes type
+	// keeps its fields protected.
+	class OwnCallContext : public rage::scrNativeCallContext
+	{
+	public:
+		OwnCallContext(void* returnValue, void* args, std::uint32_t argCount)
+		{
+			m_ReturnValue = returnValue;
+			m_Args = args;
+			m_ArgCount = argCount;
+			m_DataCount = 0;
+		}
+	};
+
+	void AddDataStringHook(rage::scrNativeCallContext* context)
+	{
+		const auto original = g_addDataStringOriginal.load();
+
+		// Read the arguments first: the script VM's return slot overlaps
+		// them, so the original call overwrites the first one.
+		const auto parent = context->GetArg<std::uint64_t>(0);
+		const char* name = context->GetArg<const char*>(1);
+		const bool isTimerString = name && std::strcmp(name, "timerString") == 0;
+
+		original(context);
+
+		if (!isTimerString)
+			return;
+
+		std::uint64_t args[3]{ parent, reinterpret_cast<std::uint64_t>("timerMessageString"),
+			reinterpret_cast<std::uint64_t>("") };
+		std::uint64_t result = 0;
+		OwnCallContext extra(&result, args, 3);
+		original(&extra);
+		g_timerMessageAdded = true;
+	}
+
 	struct AppliedPatch
 	{
 		const char* name = "";
@@ -98,6 +163,8 @@ namespace
 	{
 		rage::scrProgram* program = nullptr;
 		std::vector<AppliedPatch> patches;
+		// The program's native table while AddDataStringHook is in it.
+		rage::scrNativeHandler* nativeTable = nullptr;
 	};
 
 	std::unique_ptr<PatchedProgram> g_patch;
@@ -172,6 +239,20 @@ namespace
 			}
 		}
 
+		if (config.HideTimerMessage)
+		{
+			std::uint32_t page = 0;
+			const auto* bytes = Resolve(program, kTimerStringGuard.offset, kTimerStringGuard.expected.size(), page);
+			if (!bytes || !std::equal(kTimerStringGuard.expected.begin(), kTimerStringGuard.expected.end(), bytes) ||
+				!program->m_NativeEntrypoints || program->m_NativeCount <= kAddDataStringSlot ||
+				!program->m_NativeEntrypoints[kAddDataStringSlot] ||
+				program->m_NativeEntrypoints[kAddDataStringSlot] == &AddDataStringHook)
+			{
+				Log::Write("fillet_sp bytecode guard failed (hide-timer-message); patches not applied");
+				return false;
+			}
+		}
+
 		auto applied = std::make_unique<PatchedProgram>();
 		applied->program = program;
 		for (const auto& def : PatchDefs())
@@ -201,11 +282,22 @@ namespace
 			applied->patches.push_back(std::move(patch));
 		}
 
+		// Written last: unlike the bytecode writes above, it cannot fail, so
+		// nothing after it needs rolling back.
+		if (config.HideTimerMessage)
+		{
+			g_addDataStringOriginal = program->m_NativeEntrypoints[kAddDataStringSlot];
+			program->m_NativeEntrypoints[kAddDataStringSlot] = &AddDataStringHook;
+			applied->nativeTable = program->m_NativeEntrypoints;
+		}
+
 		// Kept even when every patch is disabled so OnTick does not re-read the
 		// INI every frame; the config is re-read on the next script load.
 		g_patch = std::move(applied);
 		for (const auto& p : g_patch->patches)
 			Log::Write(std::string("fillet_sp patched: ") + p.name);
+		if (g_patch->nativeTable)
+			Log::Write("fillet_sp patched: hide-timer-message");
 		return true;
 	}
 
@@ -223,9 +315,15 @@ namespace
 			if (liveProgram->m_CodeBlocks[p.page] != p.pageBase)
 				return false;
 
+		if (g_patch->nativeTable && liveProgram->m_NativeEntrypoints != g_patch->nativeTable)
+			return false;
+
 		for (const auto& p : g_patch->patches)
 			if (!std::equal(p.replacement.begin(), p.replacement.end(), p.target))
 				return false;
+
+		if (g_patch->nativeTable && g_patch->nativeTable[kAddDataStringSlot] != &AddDataStringHook)
+			return false;
 
 		return true;
 	}
@@ -242,6 +340,9 @@ namespace
 			for (const auto& p : g_patch->patches)
 				if (std::equal(p.replacement.begin(), p.replacement.end(), p.target))
 					WriteBytes(p.target, p.original);
+
+			if (g_patch->nativeTable)
+				g_patch->nativeTable[kAddDataStringSlot] = g_addDataStringOriginal.load();
 		}
 
 		g_patch.reset();
@@ -253,6 +354,9 @@ namespace FFFCheat
 {
 	void OnTick()
 	{
+		if (g_timerMessageAdded.exchange(false))
+			Log::Write("fillet_sp: added an empty timerMessageString to the timer");
+
 		auto liveProgram = GamePointers::FindScriptProgram(kFilletScriptHash);
 		if (g_patch)
 		{

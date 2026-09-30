@@ -13,6 +13,9 @@ namespace Config
 		// A press made before the prompt shows, or right after a flourish,
 		// is ignored instead of counting as a miss.
 		bool IgnoreEarlyPress = true;
+		// Blanks the placeholder "MESSAGE" text that a game update added to
+		// the minigame timer, and which fillet_sp never fills in.
+		bool HideTimerMessage = true;
 	};
 
 	// Re-reads FFFCheat.ini (creating it with defaults if missing) and

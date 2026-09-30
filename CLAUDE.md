@@ -51,6 +51,25 @@ Guards cover the condition (0xFDD8-0xFE0C), the block's closing `J`
 (0xFE2E) and the `LEAVE` (0xFEBA). All guards are checked before any patch is
 written; the patches apply all-or-nothing.
 
+### Third patch: hide the timer's "MESSAGE" placeholder
+
+A game update added a `TXT_Message` text element (placeholder text
+"Message", shown as "MESSAGE") to the shared `countdown_timer` UI template
+(`update_4.rpf` -> `x64/data/ui/widgets.rpf` -> `core/countdown_timer.ymt`;
+the older copy in `data_0.rpf` doesn't have it). It is bound to
+`centralScoretimer.timerMessageString`, which no SP minigame script creates,
+so the placeholder covers the timer even in the vanilla game.
+
+This is not a bytecode patch. `fillet_sp`'s own native table
+(`m_NativeEntrypoints`, program-owned) slot 35 is
+`_DATABINDING_ADD_DATA_STRING`. It is swapped for `AddDataStringHook`, which
+forwards to the original and, when the name is `timerString`, also adds an
+empty `timerMessageString` to the same container. Read the args before
+calling the original, because the VM's return slot overlaps arg 0. The guard is the
+`timerString` call in `func_606` (0x16DE7-0x16DF9, ending in
+`NATIVE 0x0D 00 23`). On unload the slot is restored only if the program
+and table are still the live ones.
+
 Offsets here come from disassembling `fillet_sp.ysc.full` with the
 decompiler's `RDR1355OpcodeSet` map; the file offset is code offset + 176.
 
@@ -84,6 +103,7 @@ boolean in `[General]`, and disabled patches are neither guarded nor written:
 [General]
 AnyButtonCounts=true
 IgnoreEarlyPress=true
+HideTimerMessage=true
 ```
 
 The INI is re-read each time the `fillet_sp` script loads (i.e. each time you
@@ -131,7 +151,9 @@ tasklist //FI "IMAGENAME eq RDR2.exe"
 A successful run logs:
 
 ```text
-fillet_sp patched: any valid button now counts as correct
+fillet_sp patched: any-button
+fillet_sp patched: ignore-early-press
+fillet_sp patched: hide-timer-message
 ```
 
 ## Releasing

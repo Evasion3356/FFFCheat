@@ -3,6 +3,15 @@
 All notable user-facing changes to FFFCheat are recorded here. Format
 loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.0] - 2026-09-30
+
+### Fixed
+- The "MESSAGE" placeholder that covers the timer at the top of the screen
+  is gone, so the timer is readable again. It's a bug in the vanilla game:
+  a game update added a message line to the minigame timer, but Five
+  Finger Fillet never fills it in. Set `HideTimerMessage=false` in
+  `FFFCheat.ini` to leave it as the game shows it.
+
 ## [1.3.0] - 2026-09-23
 
 ### Fixed

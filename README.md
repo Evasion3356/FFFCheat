@@ -1,18 +1,48 @@
 # FFFCheat
 
-`FFFCheat.asi` patches Red Dead Redemption 2's single-player
-`fillet_sp` script for game build 1491.50.
+`FFFCheat.asi` is a ScriptHookRDR2 mod for Red Dead Redemption 2's
+single-player Five Finger Fillet (`fillet_sp`, game build 1491.50).
 
-The decompiled `func_657` at bytecode position `0x1921A` is an unused
-override in the input-validation path. The patch changes its return value
-from `false` to `true`. The script still requires one of the four valid
-fillet buttons to be pressed, but it no longer compares that button against
-the generated sequence.
+## Features
 
-The mod waits for `fillet_sp` to be loaded, clones its script bytecode pages,
-verifies the expected `PUSH_CONST_0` / `LEAVE` sequence, changes only the
-constant to `PUSH_CONST_1`, and swaps the program to the cloned pages. The
-original pages are restored when the script changes or the ASI unloads.
+Each feature can be switched off in `FFFCheat.ini`, which is created next to
+`FFFCheat.asi` and re-read every time you sit at the table:
+
+```ini
+[General]
+AnyButtonCounts=true
+IgnoreEarlyPress=true
+HideTimerMessage=true
+```
+
+- **AnyButtonCounts**: any valid fillet button counts as the correct one,
+  whatever the generated sequence is.
+- **IgnoreEarlyPress**: a press made before the prompt shows, or right after
+  a flourish, is ignored instead of counting as a miss.
+- **HideTimerMessage**: removes the "MESSAGE" placeholder that covers the
+  timer. That's a vanilla-game bug: a game update added a message line to
+  the shared minigame timer UI, and `fillet_sp` never fills it in.
+
+## How it works
+
+The first two features patch `fillet_sp`'s bytecode in place, and the third
+redirects one entry in the script's native table. Everything is checked
+against the exact bytes of the traced 1491.50 script before anything is
+written. On a mismatch nothing is applied, and the log says which guard
+failed. Everything is restored when the ASI unloads while the script is
+still loaded.
+
+Runtime status is written to `FFFCheat.log` in the game directory (or
+`%LOCALAPPDATA%\RDR2ASIMods\FFFCheat.log` if that isn't writable). A
+successful load logs lines such as:
+
+```text
+fillet_sp patched: any-button
+fillet_sp patched: ignore-early-press
+fillet_sp patched: hide-timer-message
+```
+
+## Building
 
 Build from this directory with:
 
@@ -20,14 +50,6 @@ Build from this directory with:
 "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" FFFCheat.vcxproj /p:Configuration=Release /p:Platform=x64 /nologo /v:minimal
 ```
 
-The post-build step deploys `FFFCheat.asi` to the configured RDR2 game
-directory. The implementation targets the 1491.50 script layout and
-bytecode offsets; a game update requires re-validating the guard bytes and
-patch position.
-
-Runtime status is written to `FFFCheat.log` in the same game directory. A
-successful patch produces:
-
-```text
-fillet_sp patched: any valid button now counts as correct
-```
+Run `git submodule update --init` after cloning. The post-build step deploys
+`FFFCheat.asi` to the RDR2 install directory. A game update requires
+re-validating the guard bytes and offsets.

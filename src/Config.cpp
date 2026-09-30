@@ -47,10 +47,12 @@ namespace
 		const Config::Values defaults = values;
 		values.AnyButtonCounts = GetBool(general, "AnyButtonCounts", defaults.AnyButtonCounts);
 		values.IgnoreEarlyPress = GetBool(general, "IgnoreEarlyPress", defaults.IgnoreEarlyPress);
+		values.HideTimerMessage = GetBool(general, "HideTimerMessage", defaults.HideTimerMessage);
 
 		// inipp's bool parsing is boolalpha, so write true/false text.
 		general["AnyButtonCounts"] = values.AnyButtonCounts ? "true" : "false";
 		general["IgnoreEarlyPress"] = values.IgnoreEarlyPress ? "true" : "false";
+		general["HideTimerMessage"] = values.HideTimerMessage ? "true" : "false";
 
 		if (paths.usedFallback)
 			Log::Write("Config: the game folder isn't writable, so settings are saved to " +
@@ -80,7 +82,8 @@ namespace Config
 		}
 
 		Log::Write(std::string("Config: AnyButtonCounts=") + (values.AnyButtonCounts ? "true" : "false") +
-			" IgnoreEarlyPress=" + (values.IgnoreEarlyPress ? "true" : "false"));
+			" IgnoreEarlyPress=" + (values.IgnoreEarlyPress ? "true" : "false") +
+			" HideTimerMessage=" + (values.HideTimerMessage ? "true" : "false"));
 		return values;
 	}
 }
