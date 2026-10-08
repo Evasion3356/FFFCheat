@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace GamePointers
+namespace FFFCheat::GamePointers
 {
 	rage::scrProgram** GetScriptPrograms();
 	rage::scrProgram* FindScriptProgram(std::uint32_t scriptHash);

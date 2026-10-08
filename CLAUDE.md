@@ -201,10 +201,30 @@ the INI always has the current defaults and each configuration's own keys
 (Debug-only ones only in Debug). It isn't deployed to the game folder, so
 the INI you're testing with there is never overwritten.
 
+## Library (FFFCheatLib.vcxproj)
+
+The patches build as a static library, `FFFCheatLib.vcxproj`, that the ASI
+links (`ProjectReference`). `../Rampagio` pulls this repo in as a git
+submodule and links the same library, with the options as menu rows saved
+in its own `Rampagio.json`. So the library stays host-neutral:
+
+- Everything is in `namespace FFFCheat` (`FFFCheat::GamePointers`,
+  `FFFCheat::PatternScan`); Rampagio has its own `GamePointers` with the
+  same `FindScriptProgram` signature.
+- No INI, log file or script loop. Options come from the host through
+  `FFFCheat::SetOptionsProvider` (read on each `fillet_sp` load; the ASI
+  passes `Config::Load`, so the INI behaves as before), and
+  `FFFCheat::Reapply()` re-applies them at once. Lines go to the sink set
+  with `FFFCheat::Log::SetSink` (`src/FFFCheatLog.h`); don't include `Log.h`
+  from library sources.
+- It needs `external/RDR-Classes` but no ScriptHookSDK.
+- Public API: `src/FFFCheat.h`, `src/FFFCheatLog.h`. Changing it breaks
+  Rampagio's build once it moves its submodule pin.
+
 ## Source layout
 
-- `src/main.cpp` registers `ScriptMain`; every frame calls
-  `FFFCheat::OnTick()`.
+- `src/main.cpp` registers `ScriptMain`, sets the library's log sink and
+  options provider, and every frame calls `FFFCheat::OnTick()`.
 - `src/FFFCheat.cpp` owns bytecode validation, in-place patching, and
   restoration.
 - `src/GamePointers.cpp` locates the game’s script-program table and finds

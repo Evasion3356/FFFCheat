@@ -1,8 +1,7 @@
 #include "FFFCheat.h"
 
-#include "Config.h"
 #include "GamePointers.h"
-#include "Log.h"
+#include "FFFCheatLog.h"
 
 #include "..\external\RDR-Classes\rage\joaat.hpp"
 
@@ -17,6 +16,8 @@
 #include <string>
 #include <vector>
 
+namespace FFFCheat
+{
 namespace
 {
 	constexpr std::uint32_t kFilletScriptHash = rage::Joaat("fillet_sp");
@@ -42,7 +43,7 @@ namespace
 	struct PatchDef
 	{
 		const char* name;
-		bool Config::Values::* enabledBy;
+		bool Options::* enabledBy;
 		std::vector<Guard> guards;
 		std::uint32_t offset;
 		Bytes replacement;
@@ -56,7 +57,7 @@ namespace
 			// valid button counts as the expected one.
 			{
 				"any-button",
-				&Config::Values::AnyButtonCounts,
+				&Options::AnyButtonCounts,
 				{ { 0x1921A, { kEnter, 1, 3, 0, 0, kPushConstZero, kLeave, 1, 1 } } },
 				0x1921F,
 				{ kPushConstOne }
@@ -69,7 +70,7 @@ namespace
 			// ignored. Jump operand = 0xFEBA - 0xFE05 = 0xB5.
 			{
 				"ignore-early-press",
-				&Config::Values::IgnoreEarlyPress,
+				&Options::IgnoreEarlyPress,
 				{
 					// f_86 > f_87 || !HAS_ANIM_EVENT_FIRED(...), through the
 					// start of the miss block.
@@ -98,7 +99,7 @@ namespace
 			// to IOFFSET_U8_LOAD 92; PUSH_CONST_1; IEQ.
 			{
 				"ignore-early-press-no-phantom-miss",
-				&Config::Values::IgnoreEarlyPress,
+				&Options::IgnoreEarlyPress,
 				{
 					// IS_PED_A_PLAYER(ped) && f_71 == 0f ||
 					// !IS_PED_A_PLAYER(ped) && f_92 == 1, through its JZ.
@@ -197,6 +198,13 @@ namespace
 
 	std::unique_ptr<PatchedProgram> g_patch;
 
+	OptionsProvider g_optionsProvider = nullptr;
+
+	Options LoadOptions()
+	{
+		return g_optionsProvider ? g_optionsProvider() : Options{};
+	}
+
 	// The live program Apply() last refused (guard mismatch, bad layout).
 	// Compared by pointer only, like StillLive(), so a refused program isn't
 	// re-checked -- and the INI re-read, and the log re-written -- every
@@ -246,7 +254,7 @@ namespace
 			program->GetNumCodePages() == 0)
 			return false;
 
-		const Config::Values config = Config::Load();
+		const Options config = LoadOptions();
 
 		// Validate every enabled patch's guards before writing anything.
 		for (const auto& def : PatchDefs())
@@ -378,8 +386,11 @@ namespace
 	}
 }
 
-namespace FFFCheat
-{
+	void SetOptionsProvider(OptionsProvider provider)
+	{
+		g_optionsProvider = provider;
+	}
+
 	void OnTick()
 	{
 		if (g_timerMessageAdded.exchange(false))
@@ -418,6 +429,13 @@ namespace FFFCheat
 			g_rejectedProgram = liveProgram;
 			g_rejectedFirstPage = firstPage;
 		}
+	}
+
+	void Reapply()
+	{
+		Restore(GamePointers::FindScriptProgram(kFilletScriptHash));
+		g_rejectedProgram = nullptr;
+		g_rejectedFirstPage = nullptr;
 	}
 
 	void Shutdown()

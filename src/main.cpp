@@ -1,9 +1,14 @@
 #include "..\external\ScriptHookSDK\inc\main.h"
 
+#include "Config.h"
 #include "FFFCheat.h"
+#include "FFFCheatLog.h"
+#include "Log.h"
 
 void ScriptMain()
 {
+	FFFCheat::Log::SetSink([](std::string_view line) { Log::Write(std::string(line)); });
+	FFFCheat::SetOptionsProvider(Config::Load);
 	while (true)
 	{
 		FFFCheat::OnTick();

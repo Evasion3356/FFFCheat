@@ -13,22 +13,24 @@
   <ItemGroup>
     <ClCompile Include="src\Config.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\FFFCheat.cpp" />
-    <ClCompile Include="src\GamePointers.cpp" />
-    <ClCompile Include="src\PatternScan.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Config.h" />
     <ClInclude Include="src\FFFCheat.h" />
-    <ClInclude Include="src\GamePointers.h" />
     <ClInclude Include="src\Log.h" />
-    <ClInclude Include="src\PatternScan.h" />
+    <ClInclude Include="src\FFFCheatLog.h" />
     <ClInclude Include="external\inipp\inipp\inipp.h" />
     <ClInclude Include="external\RDR-Classes\base\pgBase.hpp" />
     <ClInclude Include="external\RDR-Classes\rage\joaat.hpp" />
     <ClInclude Include="external\RDR-Classes\script\scrNativeHandler.hpp" />
     <ClInclude Include="external\RDR-Classes\script\scrProgram.hpp" />
     <ClInclude Include="external\RDR-Classes\script\scrThreadContext.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The patches themselves; Rampagio links the same library. -->
+    <ProjectReference Include="FFFCheatLib.vcxproj">
+      <Project>{3E7B9C52-1A4D-4F8E-B6C3-D92A5F0E7C61}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B1DF4F1B-3D7C-4D3D-9B3E-FFFCE5B7A012}</ProjectGuid>

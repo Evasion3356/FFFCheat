@@ -1,6 +1,6 @@
 #include "GamePointers.h"
 
-#include "Log.h"
+#include "FFFCheatLog.h"
 #include "PatternScan.h"
 
 namespace
@@ -10,20 +10,20 @@ namespace
 	constexpr std::size_t kScriptProgramCount = 160;
 }
 
-namespace GamePointers
+namespace FFFCheat::GamePointers
 {
 	rage::scrProgram** GetScriptPrograms()
 	{
 		static rage::scrProgram** cached = []() -> rage::scrProgram**
 		{
-			const auto match = PatternScan::FindInMainModule(kScriptProgramsPattern);
+			const auto match = FFFCheat::PatternScan::FindInMainModule(kScriptProgramsPattern);
 			if (!match)
 			{
 				Log::Write("script-program table signature was not found");
 				return nullptr;
 			}
 
-			const auto resolved = PatternScan::ResolveRip(*match, kScriptProgramsOperandOffset) + 0xC8;
+			const auto resolved = FFFCheat::PatternScan::ResolveRip(*match, kScriptProgramsOperandOffset) + 0xC8;
 			Log::Write("script-program table resolved");
 			return reinterpret_cast<rage::scrProgram**>(resolved);
 		}();

@@ -4,19 +4,11 @@
 // %LOCALAPPDATA%\RDR2ASIMods\ when the game folder isn't writable). Backed by
 // inipp (external/inipp, a git submodule), which works on plain std streams
 // and avoids <filesystem>, unsafe on ScriptHookRDR2's small fiber stack.
+#include "FFFCheat.h"
+
 namespace Config
 {
-	struct Values
-	{
-		// Any valid Five Finger Fillet button counts as the expected one.
-		bool AnyButtonCounts = true;
-		// A press made before the prompt shows, or right after a flourish,
-		// is ignored instead of counting as a miss.
-		bool IgnoreEarlyPress = true;
-		// Blanks the placeholder "MESSAGE" text that a game update added to
-		// the minigame timer, and which fillet_sp never fills in.
-		bool HideTimerMessage = true;
-	};
+	using Values = FFFCheat::Options;
 
 	// Re-reads FFFCheat.ini (creating it with defaults if missing) and
 	// returns the values. Missing or unparsable keys keep their defaults.

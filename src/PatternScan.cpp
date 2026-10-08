@@ -47,7 +47,7 @@ namespace
 	}
 }
 
-namespace PatternScan
+namespace FFFCheat::PatternScan
 {
 	std::optional<std::uintptr_t> FindInMainModule(std::string_view pattern)
 	{
